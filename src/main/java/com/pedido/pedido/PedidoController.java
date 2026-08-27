@@ -152,4 +152,167 @@ public class PedidoController {
         // El pedido no existe
         return ResponseEntity.notFound().build();
     }
+    
+    // CANCELAR PEDIDO
+    @PutMapping("/pedido/{id}/cancelar")
+    public ResponseEntity<?> cancelarPedido(@PathVariable Long id) {
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getId().equals(id)) {
+
+                if (pedido.getEstado() == Pedido.Estado.DESPACHADO) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body("No se puede cancelar un pedido despachado");
+                }
+
+                if (pedido.getEstado() == Pedido.Estado.CANCELADO) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body("El pedido ya está cancelado");
+                }
+
+                // Si estaba confirmado, devolver el stock
+                if (pedido.getEstado() == Pedido.Estado.CONFIRMADO) {
+
+                    for (Pedido.Producto producto : productos) {
+
+                        if (producto.getId().equals(pedido.getProductoId())) {
+
+                            int nuevoStock = producto.getStock()
+                                    + pedido.getCantidad();
+
+                            producto.setStock(nuevoStock);
+                        }
+                    }
+                }
+
+                pedido.setEstado(Pedido.Estado.CANCELADO);
+
+                return ResponseEntity.ok(pedido);
+            }
+        }
+
+        return ResponseEntity.notFound().build();
+    }
+
+    // DESPACHAR PEDIDO
+    @PutMapping("/pedido/{id}/despachar")
+    public ResponseEntity<?> despacharPedido(@PathVariable Long id) {
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getId().equals(id)) {
+
+                if (pedido.getEstado() != Pedido.Estado.CONFIRMADO) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body("Solo se puede despachar un pedido confirmado");
+                }
+
+                pedido.setEstado(Pedido.Estado.DESPACHADO);
+
+                return ResponseEntity.ok(pedido);
+            }
+        }
+
+        return ResponseEntity.notFound().build();
+    }
+    
+    // PEDIDOS PENDIENTES
+    @GetMapping("/pedido/pendientes")
+    public List<Pedido> obtenerPendientes() {
+
+        List<Pedido> resultado = new ArrayList<>();
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
+
+                resultado.add(pedido);
+            }
+        }
+
+        return resultado;
+    }
+    
+    // PEDIDOS URGENTES
+    @GetMapping("/pedido/urgentes")
+    public List<Pedido> obtenerUrgentes() {
+
+        List<Pedido> resultado = new ArrayList<>();
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getPrioridad() == Pedido.Prioridad.URGENTE) {
+
+                resultado.add(pedido);
+            }
+        }
+
+        return resultado;
+    }
+    
+    // PEDIDOS POR ESTADO
+    @GetMapping("/pedido/estado")
+    public List<Pedido> obtenerPorEstado(
+            @RequestParam Pedido.Estado estado) {
+
+        List<Pedido> resultado = new ArrayList<>();
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getEstado() == estado) {
+
+                resultado.add(pedido);
+            }
+        }
+
+        return resultado;
+    }
+    
+    // RESUMEN DE PEDIDOS
+    @GetMapping("/pedido/resumen")
+    public String resumen() {
+
+        int pendientes = 0;
+        int confirmados = 0;
+        int despachados = 0;
+        int cancelados = 0;
+        int urgentes = 0;
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
+                pendientes++;
+            }
+
+            if (pedido.getEstado() == Pedido.Estado.CONFIRMADO) {
+                confirmados++;
+            }
+
+            if (pedido.getEstado() == Pedido.Estado.DESPACHADO) {
+                despachados++;
+            }
+
+            if (pedido.getEstado() == Pedido.Estado.CANCELADO) {
+                cancelados++;
+            }
+
+            if (pedido.getPrioridad() == Pedido.Prioridad.URGENTE) {
+                urgentes++;
+            }
+        }
+
+        return "Total de pedidos: " + pedidos.size()
+                + "\nPendientes: " + pendientes
+                + "\nConfirmados: " + confirmados
+                + "\nDespachados: " + despachados
+                + "\nCancelados: " + cancelados
+                + "\nUrgentes: " + urgentes;
+    }
 }

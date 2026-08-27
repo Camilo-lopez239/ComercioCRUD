@@ -31,9 +31,60 @@ public class PedidoController {
 
 
     @PostMapping("/pedido")
-    public ResponseEntity<Pedido> crearPedido(@RequestBody Pedido pedido) {
+    public ResponseEntity<?> crearPedido(@RequestBody Pedido pedido) {
 
-       
+        // Validar cliente
+        if (pedido.getCliente() == null ||
+                pedido.getCliente().trim().isEmpty()) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body("El cliente es obligatorio");
+        }
+
+        // Validar cantidad
+        if (pedido.getCantidad() <= 0) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body("La cantidad debe ser mayor que cero");
+        }
+
+        // Validar producto
+        if (pedido.getProductoId() == null) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body("El producto es obligatorio");
+        }
+
+        // Validar prioridad
+        if (pedido.getPrioridad() == null) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body("La prioridad es obligatoria");
+        }
+
+        // Buscar producto
+        boolean productoExiste = false;
+
+        for (Pedido.Producto producto : productos) {
+
+            if (producto.getId().equals(pedido.getProductoId())) {
+
+                productoExiste = true;
+            }
+        }
+
+        // Producto no existe
+        if (productoExiste == false) {
+
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("El producto no existe");
+        }
+
         pedido.setEstado(Pedido.Estado.PENDIENTE);
 
         pedidos.add(pedido);
@@ -314,5 +365,82 @@ public class PedidoController {
                 + "\nDespachados: " + despachados
                 + "\nCancelados: " + cancelados
                 + "\nUrgentes: " + urgentes;
+    }
+
+    //Atender pedidos segun prioridad
+    @GetMapping("/pedido/siguiente")
+    public ResponseEntity<?> siguientePedido() {
+
+        Pedido siguiente = null;
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
+
+                if (siguiente == null) {
+
+                    siguiente = pedido;
+
+                } else {
+
+                    if (pedido.getPrioridad() == Pedido.Prioridad.URGENTE
+                            && siguiente.getPrioridad() != Pedido.Prioridad.URGENTE) {
+
+                        siguiente = pedido;
+
+                    } else if (pedido.getPrioridad() == Pedido.Prioridad.ALTA
+                            && siguiente.getPrioridad() != Pedido.Prioridad.URGENTE
+                            && siguiente.getPrioridad() != Pedido.Prioridad.ALTA) {
+
+                        siguiente = pedido;
+
+                    } else if (pedido.getPrioridad() == Pedido.Prioridad.MEDIA
+                            && siguiente.getPrioridad() == Pedido.Prioridad.BAJA) {
+
+                        siguiente = pedido;
+
+                    } else if (pedido.getPrioridad() == siguiente.getPrioridad()
+                            && pedido.getId() < siguiente.getId()) {
+
+                        siguiente = pedido;
+                    }
+                }
+            }
+        }
+
+        if (siguiente == null) {
+
+            return ResponseEntity
+                    .notFound()
+                    .build();
+        }
+
+        return ResponseEntity.ok(siguiente);
+    }
+
+    // PEDIDOS EN RIESGO
+    @GetMapping("/pedido/en-riesgo")
+    public List<Pedido> pedidosEnRiesgo() {
+
+        List<Pedido> resultado = new ArrayList<>();
+
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
+
+                for (Pedido.Producto producto : productos) {
+
+                    if (producto.getId().equals(pedido.getProductoId())) {
+
+                        if (pedido.getCantidad() > producto.getStock()) {
+
+                            resultado.add(pedido);
+                        }
+                    }
+                }
+            }
+        }
+
+        return resultado;
     }
 }

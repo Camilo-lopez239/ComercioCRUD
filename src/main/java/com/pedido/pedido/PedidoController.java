@@ -15,12 +15,25 @@ public class PedidoController {
 
     private List<Pedido> pedidos = new ArrayList<>();
 
-    private Long siguienteId = 1L;
+    private List<Pedido.Producto> productos = new ArrayList<>();
+
+    //productos del inventario
+    @PostMapping("/producto")
+    public ResponseEntity<Pedido.Producto> agregarProducto(
+            @RequestBody Pedido.Producto producto) {
+
+        productos.add(producto);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(producto);
+    }
+
 
     @PostMapping("/pedido")
     public ResponseEntity<Pedido> crearPedido(@RequestBody Pedido pedido) {
 
-        pedido.setId(siguienteId++);
+       
         pedido.setEstado(Pedido.Estado.PENDIENTE);
 
         pedidos.add(pedido);
@@ -87,4 +100,56 @@ public class PedidoController {
         return ResponseEntity.notFound().build();
     }
 
+    @PutMapping("/pedido/{id}/confirmar")
+
+    public ResponseEntity<?> confirmarPedido(@PathVariable Long id) {
+
+        // Buscar el pedido
+        for (Pedido pedido : pedidos) {
+
+            if (pedido.getId().equals(id)) {
+
+                // Comprobar que esté pendiente
+                if (pedido.getEstado() != Pedido.Estado.PENDIENTE) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body("El pedido no está pendiente");
+                }
+
+                // Buscar el producto en el inventario
+                for (Pedido.Producto producto : productos) {
+
+                    if (producto.getId().equals(pedido.getProductoId())) {
+
+                        // Comprobar stock
+                        if (producto.getStock() < pedido.getCantidad()) {
+
+                            return ResponseEntity
+                                    .badRequest()
+                                    .body("No hay stock suficiente");
+                        }
+
+                        // Descontar stock
+                        int nuevoStock = producto.getStock() - pedido.getCantidad();
+
+                        producto.setStock(nuevoStock);
+
+                        // Cambiar estado del pedido
+                        pedido.setEstado(Pedido.Estado.CONFIRMADO);
+
+                        return ResponseEntity.ok(pedido);
+                    }
+                }
+
+                // El producto no existe
+                return ResponseEntity
+                        .status(HttpStatus.NOT_FOUND)
+                        .body("El producto no existe");
+            }
+        }
+
+        // El pedido no existe
+        return ResponseEntity.notFound().build();
+    }
 }

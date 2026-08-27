@@ -49,4 +49,18 @@ public class Pedido {
     public void setCantidad(int cantidad) {this.cantidad = cantidad;}
     public void setPrioridad(Prioridad prioridad) {this.prioridad = prioridad;}
     public void setEstado(Estado estado) {this.estado = estado;}
+
+    public static class Producto {
+
+        private Long id;
+        private int stock;
+
+        public Producto() {}
+
+        public Long getId() {return id;}
+        public int getStock() {return stock;}
+
+        public void setId(Long id) {this.id = id;}
+        public void setStock(int stock) {this.stock = stock;}
+    }
 }

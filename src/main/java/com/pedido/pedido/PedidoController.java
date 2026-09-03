@@ -1,452 +1,161 @@
 package com.pedido.pedido;
 
-import java.util.ArrayList;
 import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.pedido.Model.Pedido;
-import com.pedido.Model.Pedido.Producto;
-
+import com.pedido.Service.PedidoService;
+import com.pedido.Service.ProductoService;
 
 @RestController
 public class PedidoController {
 
-    private List<Pedido> pedidos = new ArrayList<>();
+    private final PedidoService pedidoService;
+    private final ProductoService productoService;
 
-    private List<Pedido.Producto> productos = new ArrayList<>();
-
-    @GetMapping("/producto")
-    public List<Producto> obtenerProductos() {
-
-        return productos;
+    public PedidoController(PedidoService pedidoService, ProductoService productoService) {
+        this.pedidoService = pedidoService;
+        this.productoService = productoService;
     }
-    //productos del inventario
-    @PostMapping("/producto")
-    public ResponseEntity<Pedido.Producto> agregarProducto(
-            @RequestBody Pedido.Producto producto) {
-
-        productos.add(producto);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(producto);
-    }
-
 
     @PostMapping("/pedido")
     public ResponseEntity<?> crearPedido(@RequestBody Pedido pedido) {
-
-        // Validar cliente
-        if (pedido.getCliente() == null ||
-                pedido.getCliente().trim().isEmpty()) {
-
-            return ResponseEntity
-                    .badRequest()
-                    .body("El cliente es obligatorio");
+        if (pedido.getCliente() == null || pedido.getCliente().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("El cliente es obligatorio");
         }
-
-        // Validar cantidad
         if (pedido.getCantidad() <= 0) {
-
-            return ResponseEntity
-                    .badRequest()
-                    .body("La cantidad debe ser mayor que cero");
+            return ResponseEntity.badRequest().body("La cantidad debe ser mayor que cero");
         }
-
-        // Validar producto
         if (pedido.getProductoId() == null) {
-
-            return ResponseEntity
-                    .badRequest()
-                    .body("El producto es obligatorio");
+            return ResponseEntity.badRequest().body("El producto es obligatorio");
         }
-
-        // Validar prioridad
         if (pedido.getPrioridad() == null) {
-
-            return ResponseEntity
-                    .badRequest()
-                    .body("La prioridad es obligatoria");
+            return ResponseEntity.badRequest().body("La prioridad es obligatoria");
         }
 
-        // Buscar producto
-        boolean productoExiste = false;
-
-        for (Pedido.Producto producto : productos) {
-
-            if (producto.getId().equals(pedido.getProductoId())) {
-
-                productoExiste = true;
-            }
+        if (!productoService.existeProducto(pedido.getProductoId())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El producto no existe");
         }
 
-        // Producto no existe
-        if (productoExiste == false) {
-
-            return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
-                    .body("El producto no existe");
-        }
-
-        pedido.setEstado(Pedido.Estado.PENDIENTE);
-
-        pedidos.add(pedido);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(pedido);
+        Pedido nuevo = pedidoService.crearPedido(pedido);
+        return ResponseEntity.status(HttpStatus.CREATED).body(nuevo);
     }
 
     @GetMapping("/pedido")
     public List<Pedido> obtenerPedidos() {
-
-        return pedidos;
+        return pedidoService.obtenerPedidos();
     }
 
     @GetMapping("/pedido/{id}")
     public ResponseEntity<Pedido> obtenerPedido(@PathVariable Long id) {
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getId().equals(id)) {
-                return ResponseEntity.ok(pedido);
-            }
-        }
-
-        return ResponseEntity.notFound().build();
+        Pedido pedido = pedidoService.buscarPedido(id);
+        if (pedido == null)
+            return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(pedido);
     }
-    
-    // ACTUALIZAR PEDIDO
+
     @PutMapping("/pedido/{id}")
-    public ResponseEntity<Pedido> actualizarPedido(
-            @PathVariable Long id,
-            @RequestBody Pedido pedidoNuevo) {
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getId().equals(id)) {
-
-                pedido.setCliente(pedidoNuevo.getCliente());
-                pedido.setProductoId(pedidoNuevo.getProductoId());
-                pedido.setCantidad(pedidoNuevo.getCantidad());
-                pedido.setPrioridad(pedidoNuevo.getPrioridad());
-
-                return ResponseEntity.ok(pedido);
-            }
-        }
-
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<Pedido> actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedidoNuevo) {
+        Pedido actualizado = pedidoService.actualizarPedido(id, pedidoNuevo);
+        if (actualizado == null)
+            return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(actualizado);
     }
-    
+
     @DeleteMapping("/pedido/{id}")
     public ResponseEntity<Void> eliminarPedido(@PathVariable Long id) {
-
-        for (int i = 0; i < pedidos.size(); i++) {
-
-            if (pedidos.get(i).getId().equals(id)) {
-
-                pedidos.remove(i);
-
-                return ResponseEntity.noContent().build();
-            }
-        }
-
-        return ResponseEntity.notFound().build();
+        boolean eliminado = pedidoService.eliminarPedido(id);
+        if (!eliminado)
+            return ResponseEntity.notFound().build();
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/pedido/{id}/confirmar")
-
     public ResponseEntity<?> confirmarPedido(@PathVariable Long id) {
+        String resultado = pedidoService.confirmarPedido(id);
 
-        // Buscar el pedido
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getId().equals(id)) {
-
-                // Comprobar que esté pendiente
-                if (pedido.getEstado() != Pedido.Estado.PENDIENTE) {
-
-                    return ResponseEntity
-                            .badRequest()
-                            .body("El pedido no está pendiente");
-                }
-
-                // Buscar el producto en el inventario
-                for (Pedido.Producto producto : productos) {
-
-                    if (producto.getId().equals(pedido.getProductoId())) {
-
-                        // Comprobar stock
-                        if (producto.getStock() < pedido.getCantidad()) {
-
-                            return ResponseEntity
-                                    .badRequest()
-                                    .body("No hay stock suficiente");
-                        }
-
-                        // Descontar stock
-                        int nuevoStock = producto.getStock() - pedido.getCantidad();
-
-                        producto.setStock(nuevoStock);
-
-                        // Cambiar estado del pedido
-                        pedido.setEstado(Pedido.Estado.CONFIRMADO);
-
-                        return ResponseEntity.ok(pedido);
-                    }
-                }
-
-                // El producto no existe
-                return ResponseEntity
-                        .status(HttpStatus.NOT_FOUND)
-                        .body("El producto no existe");
-            }
+        switch (resultado) {
+            case "NOT_FOUND":
+                return ResponseEntity.notFound().build();
+            case "NO_PENDIENTE":
+                return ResponseEntity.badRequest().body("El pedido no está pendiente");
+            case "PRODUCTO_NO_EXISTE":
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El producto no existe");
+            case "SIN_STOCK":
+                return ResponseEntity.badRequest().body("No hay stock suficiente");
+            default:
+                return ResponseEntity.ok(pedidoService.buscarPedido(id));
         }
-
-        // El pedido no existe
-        return ResponseEntity.notFound().build();
     }
-    
-    // CANCELAR PEDIDO
+
     @PutMapping("/pedido/{id}/cancelar")
     public ResponseEntity<?> cancelarPedido(@PathVariable Long id) {
+        String resultado = pedidoService.cancelarPedido(id);
 
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getId().equals(id)) {
-
-                if (pedido.getEstado() == Pedido.Estado.DESPACHADO) {
-
-                    return ResponseEntity
-                            .badRequest()
-                            .body("No se puede cancelar un pedido despachado");
-                }
-
-                if (pedido.getEstado() == Pedido.Estado.CANCELADO) {
-
-                    return ResponseEntity
-                            .badRequest()
-                            .body("El pedido ya está cancelado");
-                }
-
-                // Si estaba confirmado, devolver el stock
-                if (pedido.getEstado() == Pedido.Estado.CONFIRMADO) {
-
-                    for (Pedido.Producto producto : productos) {
-
-                        if (producto.getId().equals(pedido.getProductoId())) {
-
-                            int nuevoStock = producto.getStock()
-                                    + pedido.getCantidad();
-
-                            producto.setStock(nuevoStock);
-                        }
-                    }
-                }
-
-                pedido.setEstado(Pedido.Estado.CANCELADO);
-
-                return ResponseEntity.ok(pedido);
-            }
+        switch (resultado) {
+            case "NOT_FOUND":
+                return ResponseEntity.notFound().build();
+            case "DESPACHADO":
+                return ResponseEntity.badRequest().body("No se puede cancelar un pedido despachado");
+            case "YA_CANCELADO":
+                return ResponseEntity.badRequest().body("El pedido ya está cancelado");
+            default:
+                return ResponseEntity.ok(pedidoService.buscarPedido(id));
         }
-
-        return ResponseEntity.notFound().build();
     }
 
-    // DESPACHAR PEDIDO
     @PutMapping("/pedido/{id}/despachar")
     public ResponseEntity<?> despacharPedido(@PathVariable Long id) {
+        String resultado = pedidoService.despacharPedido(id);
 
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getId().equals(id)) {
-
-                if (pedido.getEstado() != Pedido.Estado.CONFIRMADO) {
-
-                    return ResponseEntity
-                            .badRequest()
-                            .body("Solo se puede despachar un pedido confirmado");
-                }
-
-                pedido.setEstado(Pedido.Estado.DESPACHADO);
-
-                return ResponseEntity.ok(pedido);
-            }
+        switch (resultado) {
+            case "NOT_FOUND":
+                return ResponseEntity.notFound().build();
+            case "NO_CONFIRMADO":
+                return ResponseEntity.badRequest().body("Solo se puede despachar un pedido confirmado");
+            default:
+                return ResponseEntity.ok(pedidoService.buscarPedido(id));
         }
-
-        return ResponseEntity.notFound().build();
     }
-    
-    // PEDIDOS PENDIENTES
+
     @GetMapping("/pedido/pendientes")
     public List<Pedido> obtenerPendientes() {
-
-        List<Pedido> resultado = new ArrayList<>();
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
-
-                resultado.add(pedido);
-            }
-        }
-
-        return resultado;
+        return pedidoService.obtenerPendientes();
     }
-    
-    // PEDIDOS URGENTES
+
     @GetMapping("/pedido/urgentes")
     public List<Pedido> obtenerUrgentes() {
-
-        List<Pedido> resultado = new ArrayList<>();
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getPrioridad() == Pedido.Prioridad.URGENTE) {
-
-                resultado.add(pedido);
-            }
-        }
-
-        return resultado;
+        return pedidoService.obtenerUrgentes();
     }
-    
-    // PEDIDOS POR ESTADO
+
     @GetMapping("/pedido/estado")
-    public List<Pedido> obtenerPorEstado(
-            @RequestParam Pedido.Estado estado) {
-
-        List<Pedido> resultado = new ArrayList<>();
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getEstado() == estado) {
-
-                resultado.add(pedido);
-            }
-        }
-
-        return resultado;
+    public List<Pedido> obtenerPorEstado(@RequestParam Pedido.Estado estado) {
+        return pedidoService.obtenerPorEstado(estado);
     }
-    
-    // RESUMEN DE PEDIDOS
+
     @GetMapping("/pedido/resumen")
     public String resumen() {
-
-        int pendientes = 0;
-        int confirmados = 0;
-        int despachados = 0;
-        int cancelados = 0;
-        int urgentes = 0;
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
-                pendientes++;
-            }
-
-            if (pedido.getEstado() == Pedido.Estado.CONFIRMADO) {
-                confirmados++;
-            }
-
-            if (pedido.getEstado() == Pedido.Estado.DESPACHADO) {
-                despachados++;
-            }
-
-            if (pedido.getEstado() == Pedido.Estado.CANCELADO) {
-                cancelados++;
-            }
-
-            if (pedido.getPrioridad() == Pedido.Prioridad.URGENTE) {
-                urgentes++;
-            }
-        }
-
-        return "Total de pedidos: " + pedidos.size()
-                + "\nPendientes: " + pendientes
-                + "\nConfirmados: " + confirmados
-                + "\nDespachados: " + despachados
-                + "\nCancelados: " + cancelados
-                + "\nUrgentes: " + urgentes;
+        return pedidoService.generarResumen();
     }
 
-    //Atender pedidos segun prioridad
     @GetMapping("/pedido/siguiente")
     public ResponseEntity<?> siguientePedido() {
-
-        Pedido siguiente = null;
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
-
-                if (siguiente == null) {
-
-                    siguiente = pedido;
-
-                } else {
-
-                    if (pedido.getPrioridad() == Pedido.Prioridad.URGENTE
-                            && siguiente.getPrioridad() != Pedido.Prioridad.URGENTE) {
-
-                        siguiente = pedido;
-
-                    } else if (pedido.getPrioridad() == Pedido.Prioridad.ALTA
-                            && siguiente.getPrioridad() != Pedido.Prioridad.URGENTE
-                            && siguiente.getPrioridad() != Pedido.Prioridad.ALTA) {
-
-                        siguiente = pedido;
-
-                    } else if (pedido.getPrioridad() == Pedido.Prioridad.MEDIA
-                            && siguiente.getPrioridad() == Pedido.Prioridad.BAJA) {
-
-                        siguiente = pedido;
-
-                    } else if (pedido.getPrioridad() == siguiente.getPrioridad()
-                            && pedido.getId() < siguiente.getId()) {
-
-                        siguiente = pedido;
-                    }
-                }
-            }
-        }
-
-        if (siguiente == null) {
-
-            return ResponseEntity
-                    .notFound()
-                    .build();
-        }
-
+        Pedido siguiente = pedidoService.obtenerSiguiente();
+        if (siguiente == null)
+            return ResponseEntity.notFound().build();
         return ResponseEntity.ok(siguiente);
     }
 
-    // PEDIDOS EN RIESGO
     @GetMapping("/pedido/en-riesgo")
     public List<Pedido> pedidosEnRiesgo() {
+        return pedidoService.obtenerPedidosEnRiesgo();
+    }
 
-        List<Pedido> resultado = new ArrayList<>();
-
-        for (Pedido pedido : pedidos) {
-
-            if (pedido.getEstado() == Pedido.Estado.PENDIENTE) {
-
-                for (Pedido.Producto producto : productos) {
-
-                    if (producto.getId().equals(pedido.getProductoId())) {
-
-                        if (pedido.getCantidad() > producto.getStock()) {
-
-                            resultado.add(pedido);
-                        }
-                    }
-                }
-            }
-        }
-
-        return resultado;
+    
+    @GetMapping("/pedido/buscar/cliente")
+    public List<Pedido> buscarPorCliente(@RequestParam String nombre) {
+        return pedidoService.buscarPorCliente(nombre);
     }
 }

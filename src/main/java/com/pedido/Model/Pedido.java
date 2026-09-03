@@ -1,26 +1,28 @@
 package com.pedido.Model;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 
+@Entity
 public class Pedido {
     //definimos las prioridades
-    public enum Prioridad {
-        BAJA,
-        MEDIA,
-        ALTA,
-        URGENTE
-    }
+    public enum Prioridad {BAJA, MEDIA, ALTA, URGENTE}
     //definimos los estados
-    public enum Estado {
-        PENDIENTE,
-        CONFIRMADO,
-        DESPACHADO,
-        CANCELADO
-    }
+    public enum Estado {PENDIENTE, CONFIRMADO, DESPACHADO, CANCELADO}
+    
+    @Id
+     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String cliente;
     private Long productoId;
     private int cantidad;
+    @Enumerated(EnumType.STRING)
     private Prioridad prioridad;
+    @Enumerated(EnumType.STRING)
     private Estado estado;
 
     public Pedido() {
@@ -50,17 +52,5 @@ public class Pedido {
     public void setPrioridad(Prioridad prioridad) {this.prioridad = prioridad;}
     public void setEstado(Estado estado) {this.estado = estado;}
 
-    public static class Producto {
-
-        private Long id;
-        private int stock;
-
-        public Producto() {}
-
-        public Long getId() {return id;}
-        public int getStock() {return stock;}
-
-        public void setId(Long id) {this.id = id;}
-        public void setStock(int stock) {this.stock = stock;}
-    }
+    
 }

@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.pedido.Model.Pedido;
+import com.pedido.Model.Pedido.Producto;
 
 
 @RestController
@@ -17,6 +18,11 @@ public class PedidoController {
 
     private List<Pedido.Producto> productos = new ArrayList<>();
 
+    @GetMapping("/producto")
+    public List<Producto> obtenerProductos() {
+
+        return productos;
+    }
     //productos del inventario
     @PostMapping("/producto")
     public ResponseEntity<Pedido.Producto> agregarProducto(
